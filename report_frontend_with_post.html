@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Browser Capability Report</title>
+<style>
+body {font-family: Arial, sans-serif; background:#0f172a; color:#e6eef8; padding:20px;}
+button {padding:10px 14px; border:none; border-radius:6px; cursor:pointer; background:#1d4ed8; color:white;}
+pre {white-space:pre-wrap; background:#1e293b; padding:12px; border-radius:8px;}
+</style>
+</head>
+<body>
+<h2>Run & Save Browser Report</h2>
+<button id="run">Run & Save</button>
+<pre id="out">Waiting...</pre>
+
+<script>
+async function getPublicIP() {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    return (await res.json()).ip;
+  } catch { return null; }
+}
+
+function getHardware() {
+  return { cores: navigator.hardwareConcurrency, memory: navigator.deviceMemory };
+}
+
+function getScreen() {
+  return { width: screen.width, height: screen.height, pixelRatio: window.devicePixelRatio };
+}
+
+async function getGeo() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(pos => {
+      resolve({
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      });
+    }, () => resolve(null));
+  });
+}
+
+function updateOut(data) {
+  document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+}
+
+document.getElementById('run').addEventListener('click', async () => {
+  updateOut({status: 'Collecting data...'});
+  
+  const payload = {
+    userAgent: navigator.userAgent,
+    publicIP: await getPublicIP(),
+    geolocation: await getGeo(),
+    languages: navigator.languages.join(', '),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    hardware: getHardware(),
+    screenInfo: getScreen(),
+    referrer: document.referrer,
+    address: null
+  };
+
+  updateOut(payload);
+
+  try {
+    const res = await fetch('save.php', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const j = await res.json();
+    updateOut({saved: j, payload});
+  } catch (e) {
+    updateOut({error: e.message, payload});
+  }
+});
+</script>
+</body>
+</html>
